@@ -1,9 +1,15 @@
 import _ from "lodash";
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import Container from "@material-ui/core/Container";
 import Grid from "@material-ui/core/Grid";
-import { AppBar, Box, Input, InputAdornment, makeStyles, Tab, Tabs, TextField, Theme, Tooltip, Typography, useTheme } from "@material-ui/core";
+import { AppBar, Box, InputAdornment, makeStyles, Tab, Tabs, TextField, TextFieldProps, Theme, Tooltip, Typography, useTheme } from "@material-ui/core";
 import { Help } from "@material-ui/icons";
+import * as yup from "yup";
+import NumberFormat from "react-number-format";
+import { FormikConfig, FormikValues, useFormik } from "formik";
+import { stringify } from "querystring";
+import { useRouter } from "../util/router";
+// TODO: Do I need this?
 import classes from "*.module.css";
 
 type FormField = {
@@ -11,11 +17,13 @@ type FormField = {
   label: string,
   inputType: string,
   gridWidth: number,
-  defaultValue?: number,
+  defaultValue: number | string,
   required?: boolean,
   startAdornment?: string,
   endAdornment?: string,
   helperText?: string[],
+  formatWithCommas?: boolean,
+  validator?: yup.BaseSchema,
 };
 
 type TabType = {
@@ -49,7 +57,9 @@ const TABS: TabType[] = [
         inputType: 'text',
         gridWidth: 6,
         required: true,
+        defaultValue: '',
         startAdornment: '🏠',
+        validator: yup.string().required(),
       },
       {
         id: 'purchase_price',
@@ -57,27 +67,42 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
+        defaultValue: '',
         startAdornment: '$',
+        formatWithCommas: true,
+        validator: yup
+          .number()
+          .min(0, 'Purchase Price must be greater than or equal to $${min}.')
+          .required()
       },
       {
         id: 'closing_costs',
         label: 'Closing Costs',
         inputType: 'number',
         gridWidth: 3,
+        defaultValue: '',
         startAdornment: '$',
+        formatWithCommas: true,
+        validator: yup
+          .number()
+          .min(0, 'Closing Costs must be greater than or equal to $${min}.')
       },
     ],
   },
   {
     tabTitle: 'Loan Details',
     formFields: [
-      {
-        id: 'loan_type',
-        label: 'Loan Type',
-        inputType: 'text',
-        gridWidth: 3,
-        required: true,
-      },
+      // TODO: Consider adding as buttons or dropdown later
+      // {
+      //   id: 'loan_type',
+      //   label: 'Loan Type',
+      //   inputType: 'text',
+      //   gridWidth: 3,
+      //   defaultValue: '',
+      //   required: true,
+      //   validator: yup.string().required(),
+      // },
+      // TODO: Maybe remove or make radio buttons
       {
         id: 'term',
         label: 'Loan Term',
@@ -86,6 +111,10 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: 30,
         endAdornment: 'Years',
+        validator: yup
+          .mixed()
+          .oneOf([15, 30], 'Loan Term must be either 15 or 30 years.')
+          .required()
       },
       {
         id: 'percentage_down',
@@ -95,6 +124,15 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: 20,
         endAdornment: '%',
+        validator: yup
+          .number()
+          .min(0, 'Down Payment Percentage must be greater than or equal to ${min}%.')
+          .max(100, 'Down Payment Percentage must be less than or equal to ${max}%.')
+          .required(),
+        helperText: [
+          `Please note that PMI is not calculated or incorporated into the analysis regardless
+          of the down payment percentage.`,
+        ],
       },
       {
         id: 'interest_rate',
@@ -102,8 +140,13 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 0.0275,
+        defaultValue: 2.75,
         endAdornment: '%',
+        validator: yup
+          .number()
+          .min(0, 'Interest Rate must be greater than or equal to ${min}%.')
+          .max(100, 'Interest Rate must be less than or equal to ${max}%.')
+          .required()
       },
     ],
   },
@@ -116,25 +159,41 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
+        defaultValue: '',
         startAdornment: '$',
+        formatWithCommas: true,
+        validator: yup
+          .number()
+          .min(0, 'Monthly Rent must be greater than or equal to $${min}.')
+          .required()
       },
+      // TODO: This needs to be a dollar amount or tied to dollar amount field
       {
-        id: 'tax_rate',
-        label: 'Tax Rate',
+        id: 'annual_taxes',
+        label: 'Annual Taxes',
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 0.50,
-        endAdornment: '%',
+        defaultValue: '',
+        startAdornment: '$',
+        validator: yup
+          .number()
+          .min(0, 'Annual Taxes must be greater than or equal to $${min}.')
+          .required()
       },
       {
         id: 'monthly_insurance',
-        label: 'Monthly Insurance Cost',
+        label: 'Monthly Insurance Expense',
         inputType: 'number',
         gridWidth: 3,
         required: true,
         defaultValue: 200,
         endAdornment: '$',
+        formatWithCommas: true,
+        validator: yup
+          .number()
+          .min(0, 'Monthly Insurance Expense must be greater than or equal to $${min}.')
+          .required()
       },
     ],
   },
@@ -156,6 +215,11 @@ const TABS: TabType[] = [
           and other factors.`,
           `Generally, setting aside 5-10% of rental income for CapEx is a good rule of thumb.`,
         ],
+        validator: yup
+          .number()
+          .min(0, 'Capex Rate must be greater than or equal to ${min}%.')
+          .max(100, 'Capex Rate must be less than or equal to ${max}%.')
+          .required()
       },
       {
         id: 'repairs_rate',
@@ -172,6 +236,11 @@ const TABS: TabType[] = [
           `Generally, setting aside 5-10% of rental income for repairs is a good
           rule of thumb.`
         ],
+        validator: yup
+          .number()
+          .min(0, 'Repairs Rate must be greater than or equal to ${min}%.')
+          .max(100, 'Repairs Rate must be less than or equal to ${max}%.')
+          .required()
       },
       {
         id: 'vacancy_rate',
@@ -181,13 +250,18 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: 5,
         endAdornment: '%',
-        helperText: [`
-          Vacancy Rate is calculated as the percentage of time your property sits empty due
+        helperText: [
+          `Vacancy Rate is calculated as the percentage of time your property sits empty due
           to tentant turnover. This figure will vary depending on the property's location and
           condition, so talk to a local agent or investor to gain a better understanding of
           expected vacancy.`,
           `Typical vacancy rates range from 3-10%.`
         ],
+        validator: yup
+          .number()
+          .min(0, 'Vacancy Rate must be greater than or equal to ${min}%.')
+          .max(100, 'Vacancy Rate must be less than or equal to ${max}%.')
+          .required()
       },
       {
         id: 'property_management_rate',
@@ -202,8 +276,13 @@ const TABS: TabType[] = [
           represents the amount charged by the property manager to manage your property.`,
           `Typical property management fees range from 9-12% depending on the market and
           services provided.`,
-          `Leave this field blank if you plan on managing your property yourself.`
+          `Enter 0 if you plan on managing your property yourself.`
         ],
+        validator: yup
+          .number()
+          .min(0, 'Property Management Rate must be greater than or equal to ${min}%.')
+          .max(100, 'Property Management Rate must be less than or equal to ${max}%.')
+          .required()
       },
     ],
   },
@@ -218,6 +297,11 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: 2,
         endAdornment: '%',
+        validator: yup
+          .number()
+          .min(0, 'Annual Appreciation Rate must be greater than or equal to ${min}%.')
+          .max(100, 'Annual Appreciation Rate must be less than or equal to ${max}%.')
+          .required()
       },
       {
         id: 'rent_growth',
@@ -227,6 +311,11 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: 2,
         endAdornment: '%',
+        validator: yup
+          .number()
+          .min(0, 'Annual Rent Growth must be greater than or equal to ${min}%.')
+          .max(100, 'Annual Rent Growth must be less than or equal to ${max}%.')
+          .required()
       },
       {
         id: 'expense_growth',
@@ -236,6 +325,11 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: 2,
         endAdornment: '%',
+        validator: yup
+          .number()
+          .min(0, 'Annual Expense Growth must be greater than or equal to ${min}%.')
+          .max(100, 'Annual Expense Growth must be less than or equal to ${max}%.')
+          .required()
       },
       {
         id: 'selling_expense_rate',
@@ -245,10 +339,41 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: 8,
         endAdornment: '%',
+        helperText: [
+          `Selling Expense Rate represents the commission paid to the realtor
+          upon the sale of your property.`,
+          `Generally, this totals 5-10% of total sale proceeds.`
+        ],
+        validator: yup
+          .number()
+          .min(0, 'Selling Expense Rate must be greater than or equal to ${min}%.')
+          .max(100, 'Selling Expense Rate must be less than or equal to ${max}%.')
+          .required()
       },
     ],
   },
 ];
+
+function generateInitialValues(tabs: TabType[]) {
+  const initialValues: { [key: string]: number | string }  = {};
+  _.forEach(tabs, (tab: TabType) => {
+    _.forEach(tab.formFields, (f: FormField) => {
+      // @ts-ignore
+      initialValues[f.id] = f.defaultValue;
+    })
+  });
+  return initialValues;
+}
+
+function generateValidators(tabs: TabType[]) {
+  const validators: { [key: string]: yup.BaseSchema | undefined } = {};
+  _.forEach(tabs, (tab: TabType) => {
+    _.forEach(tab.formFields, (f: FormField) => {
+      validators[f.id] = f.validator;
+    })
+  });
+  return validators;
+}
 
 function a11yProps(index: any) {
   return {
@@ -316,13 +441,25 @@ function TabPanel(props: TabPanelProps) {
 
 type FormGridProps = {
   fields: FormField[],
+  formik: any,
 };
 
-function FormGrid(props: FormGridProps) {
+function FormGrid({ fields, formik }: FormGridProps) {
+  // const handleChangeWrapper = useMemo(
+  //   () => (
+  //     (e: React.ChangeEvent<any>) => {
+  //       // TODO: Can't update querystring any more --> do I even need this custom function?
+  //       formik.handleChange(e);
+  //     }
+  //   ),
+  //   [formik.handleChange]
+  // );
+
+
   const classes = useStyles();
   return (
     <Grid container spacing={2}>
-      {_.map(props.fields, (field: FormField) => (
+      {_.map(fields, (field: FormField) => (
         // @ts-ignore
         <Grid item xs={field.gridWidth}>
           <TextField
@@ -331,6 +468,17 @@ function FormGrid(props: FormGridProps) {
             type={field.inputType}
             required={field.required}
             fullWidth // TODO: Consider styling options
+
+            // formik:
+            value={formik.values[field.id]}
+            // TODO: Replace with wrapper function that also updates querystring
+            onChange={formik.handleChange}
+            onBlur={formik.handleBlur} // https://stackoverflow.com/a/57481493
+            error={formik.touched[field.id] && Boolean(formik.errors[field.id])}
+            helperText={formik.touched[field.id] && formik.errors[field.id]}
+
+            // TODO: Need to add comma formatting
+
             InputLabelProps={{
               shrink: true,
             }}
@@ -353,7 +501,7 @@ function FormGrid(props: FormGridProps) {
                     </InputAdornment>
                   )
                   : null
-              )
+              ),
             }}
             className={classes.number}
             variant="outlined"
@@ -368,14 +516,16 @@ function FormGrid(props: FormGridProps) {
 
 type NewGenericTabsProps = {
   tabs: TabType[],
-}
+  formik: any,
+};
 
 function GenericTabs(props: NewGenericTabsProps) {
   const classes = useStyles();
   const theme = useTheme();
   const [value, setValue] = React.useState(0);
 
-  const handleChange = (event: React.ChangeEvent<{}>, newValue: number) => setValue(newValue);
+  // TODO: is this the right use of useMemo?
+  const handleTabChange = useMemo(() => (event: React.ChangeEvent<{}>, newValue: number) => setValue(newValue), []);
 
   return (
     <div>
@@ -383,7 +533,7 @@ function GenericTabs(props: NewGenericTabsProps) {
         {/* TODO: Consider stepper instead of tabs */}
         <Tabs
           value={value}
-          onChange={handleChange}
+          onChange={handleTabChange}
           indicatorColor="secondary"
           textColor="secondary"
         >
@@ -394,23 +544,45 @@ function GenericTabs(props: NewGenericTabsProps) {
       </AppBar>
       {props.tabs.map((tab: TabType, idx) => (
         <TabPanel value={value} index={idx} dir={theme.direction}>
-          <FormGrid fields={tab.formFields} />
+          <FormGrid fields={tab.formFields} formik={props.formik} />
         </TabPanel>
       ))}
     </div>
   );
 }
 
+// @ts-ignore
+const validationSchema = yup.object(generateValidators(TABS));
+
 // TODO: pass TABS into this component in case it becomes API call later
 function AnalyzePage(props: any) {
   const classes = useStyles();
+  const router = useRouter();
+
+  const formik = useFormik({
+    initialValues: generateInitialValues(TABS),
+    validationSchema,
+    onSubmit: v => console.log(v),
+    // TODO: Figure out validation
+    // validateOnBlur: true,
+  });
+
+  console.log({ fve: formik.errors, ft: formik.touched });
+
+  useEffect(() => {
+    // router.history.location.search = stringify(formik.values)
+    router.history.replace(`/analyze?${stringify(formik.values)}`);
+  }, [formik.values]);
+
   return (
     // TODO: Utilize MUI theming / spacing
     <Container className={classes.root}>
       <Grid container spacing={3}>
         <Grid item xs={12}>
           {/* TODO: Consider adding button allowing users to hide inputs */}
-          <GenericTabs tabs={TABS} />
+          <form>
+            <GenericTabs tabs={TABS} formik={formik} />
+          </form>
         </Grid>
       </Grid>
     </Container>
