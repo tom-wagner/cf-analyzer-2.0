@@ -38,6 +38,7 @@ function App(props: any) {
 
             <Route exact path="/contact" component={ContactPage} />
 
+            {/* <Route exact={false} strict={false} path={"/^\/analyze\/.*$/"} component={AnalyzePage} /> */}
             <Route exact path="/analyze" component={AnalyzePage} />
 
             {/* <Route

@@ -422,7 +422,6 @@ function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
 
   return (
-    // TODO: Improve styling here
     <div
       role="tabpanel"
       hidden={value !== index}
@@ -432,7 +431,7 @@ function TabPanel(props: TabPanelProps) {
     >
       {value === index && (
         <Box p={3}>
-          <Typography>{children}</Typography>
+          <Typography component="span">{children}</Typography>
         </Box>
       )}
     </div>
@@ -461,7 +460,7 @@ function FormGrid({ fields, formik }: FormGridProps) {
     <Grid container spacing={2}>
       {_.map(fields, (field: FormField) => (
         // @ts-ignore
-        <Grid item xs={field.gridWidth}>
+        <Grid key={field.id} item xs={field.gridWidth}>
           <TextField
             id={field.id}
             label={field.label}
@@ -538,12 +537,12 @@ function GenericTabs(props: NewGenericTabsProps) {
           textColor="secondary"
         >
           {props.tabs.map((tab: TabType, idx) => (
-            <Tab label={tab.tabTitle} {...a11yProps(idx)} className={classes.tabPanel} />
+            <Tab key={idx} label={tab.tabTitle} {...a11yProps(idx)} className={classes.tabPanel} />
           ))}
         </Tabs>
       </AppBar>
       {props.tabs.map((tab: TabType, idx) => (
-        <TabPanel value={value} index={idx} dir={theme.direction}>
+        <TabPanel key={idx} value={value} index={idx} dir={theme.direction}>
           <FormGrid fields={tab.formFields} formik={props.formik} />
         </TabPanel>
       ))}
@@ -567,11 +566,9 @@ function AnalyzePage(props: any) {
     // validateOnBlur: true,
   });
 
-  console.log({ fve: formik.errors, ft: formik.touched });
-
   useEffect(() => {
-    // router.history.location.search = stringify(formik.values)
-    router.history.replace(`/analyze?${stringify(formik.values)}`);
+    // TODO: This is not working --> seems to be related to the querystring messing with route matching
+    // router.history.replace('/analyze?' + stringify(formik.values));
   }, [formik.values]);
 
   return (
