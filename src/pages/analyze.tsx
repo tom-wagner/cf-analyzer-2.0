@@ -567,8 +567,7 @@ function AnalyzePage(props: any) {
   });
 
   useEffect(() => {
-    // TODO: This is not working --> seems to be related to the querystring messing with route matching
-    // router.history.replace('/analyze?' + stringify(formik.values));
+    router.history.replace('/analyze?' + stringify(formik.values));
   }, [formik.values]);
 
   return (

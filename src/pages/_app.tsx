@@ -16,7 +16,7 @@ import { ThemeProvider } from "./../util/theme";
 
 function App(props: any) {
   return (
-    // TODO: Consider using Globals
+    // TODO: Consider using Globals for styling
     <ThemeProvider>
       {/* <AuthProvider> */}
       <Router>

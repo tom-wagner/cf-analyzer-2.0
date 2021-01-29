@@ -19,7 +19,6 @@
     "firebase": "8.1.2",
     "firebase-admin": "9.4.2",
     "formik": "^2.2.6",
-    "history": "^5.0.0",
     "lodash": "^4.17.20",
     "mailchimp-api-v3": "1.13.1",
     "query-string": "^6.9.0",
