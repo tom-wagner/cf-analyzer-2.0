@@ -6,11 +6,9 @@ import { AppBar, Box, InputAdornment, makeStyles, Tab, Tabs, TextField, TextFiel
 import { Help } from "@material-ui/icons";
 import * as yup from "yup";
 import NumberFormat from "react-number-format";
-import { FormikConfig, FormikValues, useFormik } from "formik";
+import { useFormik } from "formik";
 import { stringify } from "querystring";
 import { useRouter } from "../util/router";
-// TODO: Do I need this?
-import classes from "*.module.css";
 
 type FormField = {
   id: string,
@@ -44,6 +42,19 @@ function Paragraphs(props: { paragraphs: string[] }) {
   );
 }
 
+function NumberFieldWithCommas(props: any) {
+  return (
+    <NumberFormat
+      isNumericString={true}
+      thousandSeparator={true}
+      customInput={TextField}
+      {...props}
+    />
+  );
+}
+
+const stringToNumberYupTransformer = (_: any, val: any) => parseInt(val.replace(/,/, ''));
+
 const TABS: TabType[] = [
   // TODO: Consider allowing users to populate certain fields this from saved settings
   {
@@ -51,6 +62,7 @@ const TABS: TabType[] = [
     formFields: [
       // TODO: Integrate with Google Maps API
       // TODO: Add Validator Functions
+      // TODO: consider adding mobile grid width in conjunction with breakpoints and only use 6 / 12
       {
         id: 'property_address',
         label: 'Property Address',
@@ -72,9 +84,12 @@ const TABS: TabType[] = [
         formatWithCommas: true,
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Purchase Price must be greater than or equal to $${min}.')
           .required()
       },
+      // TODO: Consider breaking this out into financed/not financed
+      // TODO: Consider adding helper text to describe closing costs and mention that mortgage points should be included here
       {
         id: 'closing_costs',
         label: 'Closing Costs',
@@ -85,6 +100,7 @@ const TABS: TabType[] = [
         formatWithCommas: true,
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Closing Costs must be greater than or equal to $${min}.')
       },
     ],
@@ -109,11 +125,16 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 30,
+        defaultValue: '30',
         endAdornment: 'Years',
+        formatWithCommas: true,
         validator: yup
-          .mixed()
-          .oneOf([15, 30], 'Loan Term must be either 15 or 30 years.')
+          .number()
+          .transform(stringToNumberYupTransformer)
+          .test({
+            test: (v: any) => v === 30 || v === 15,
+            message: 'Term must be either 15 or 30 years'
+          })
           .required()
       },
       {
@@ -122,10 +143,12 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 20,
+        formatWithCommas: true,
+        defaultValue: '20',
         endAdornment: '%',
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Down Payment Percentage must be greater than or equal to ${min}%.')
           .max(100, 'Down Payment Percentage must be less than or equal to ${max}%.')
           .required(),
@@ -140,10 +163,12 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 2.75,
+        defaultValue: '2.75',
+        formatWithCommas: true,
         endAdornment: '%',
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Interest Rate must be greater than or equal to ${min}%.')
           .max(100, 'Interest Rate must be less than or equal to ${max}%.')
           .required()
@@ -164,6 +189,7 @@ const TABS: TabType[] = [
         formatWithCommas: true,
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Monthly Rent must be greater than or equal to $${min}.')
           .required()
       },
@@ -176,8 +202,10 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: '',
         startAdornment: '$',
+        formatWithCommas: true,
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Annual Taxes must be greater than or equal to $${min}.')
           .required()
       },
@@ -187,11 +215,12 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 200,
-        endAdornment: '$',
+        defaultValue: '200',
+        startAdornment: '$',
         formatWithCommas: true,
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Monthly Insurance Expense must be greater than or equal to $${min}.')
           .required()
       },
@@ -206,7 +235,8 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 5,
+        formatWithCommas: true,
+        defaultValue: '5',
         endAdornment: '%',
         helperText: [
           `Capital Expenditures Rate is calculated as the annual cost of major expenditures
@@ -217,6 +247,7 @@ const TABS: TabType[] = [
         ],
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Capex Rate must be greater than or equal to ${min}%.')
           .max(100, 'Capex Rate must be less than or equal to ${max}%.')
           .required()
@@ -227,7 +258,8 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 5,
+        formatWithCommas: true,
+        defaultValue: '5',
         endAdornment: '%',
         helperText: [
           `Repairs & Maintenance Rate is calculated as the annual cost of property repairs
@@ -238,6 +270,7 @@ const TABS: TabType[] = [
         ],
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Repairs Rate must be greater than or equal to ${min}%.')
           .max(100, 'Repairs Rate must be less than or equal to ${max}%.')
           .required()
@@ -248,7 +281,8 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 5,
+        formatWithCommas: true,
+        defaultValue: '5',
         endAdornment: '%',
         helperText: [
           `Vacancy Rate is calculated as the percentage of time your property sits empty due
@@ -259,6 +293,7 @@ const TABS: TabType[] = [
         ],
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Vacancy Rate must be greater than or equal to ${min}%.')
           .max(100, 'Vacancy Rate must be less than or equal to ${max}%.')
           .required()
@@ -269,7 +304,8 @@ const TABS: TabType[] = [
         inputType: 'number',
         gridWidth: 3,
         required: true,
-        defaultValue: 12,
+        formatWithCommas: true,
+        defaultValue: '12',
         endAdornment: '%',
         helperText: [
           `Property Management Rate is expressed as a percentage of total rental income and
@@ -280,6 +316,7 @@ const TABS: TabType[] = [
         ],
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Property Management Rate must be greater than or equal to ${min}%.')
           .max(100, 'Property Management Rate must be less than or equal to ${max}%.')
           .required()
@@ -295,10 +332,12 @@ const TABS: TabType[] = [
         inputType: 'text',
         gridWidth: 3,
         required: true,
-        defaultValue: 2,
+        formatWithCommas: true,
+        defaultValue: '2',
         endAdornment: '%',
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Annual Appreciation Rate must be greater than or equal to ${min}%.')
           .max(100, 'Annual Appreciation Rate must be less than or equal to ${max}%.')
           .required()
@@ -309,10 +348,12 @@ const TABS: TabType[] = [
         inputType: 'text',
         gridWidth: 3,
         required: true,
-        defaultValue: 2,
+        formatWithCommas: true,
+        defaultValue: '2',
         endAdornment: '%',
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Annual Rent Growth must be greater than or equal to ${min}%.')
           .max(100, 'Annual Rent Growth must be less than or equal to ${max}%.')
           .required()
@@ -323,10 +364,11 @@ const TABS: TabType[] = [
         inputType: 'text',
         gridWidth: 3,
         required: true,
-        defaultValue: 2,
+        defaultValue: '2',
         endAdornment: '%',
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Annual Expense Growth must be greater than or equal to ${min}%.')
           .max(100, 'Annual Expense Growth must be less than or equal to ${max}%.')
           .required()
@@ -337,7 +379,8 @@ const TABS: TabType[] = [
         inputType: 'text',
         gridWidth: 3,
         required: true,
-        defaultValue: 8,
+        formatWithCommas: true,
+        defaultValue: '8',
         endAdornment: '%',
         helperText: [
           `Selling Expense Rate represents the commission paid to the realtor
@@ -346,6 +389,7 @@ const TABS: TabType[] = [
         ],
         validator: yup
           .number()
+          .transform(stringToNumberYupTransformer)
           .min(0, 'Selling Expense Rate must be greater than or equal to ${min}%.')
           .max(100, 'Selling Expense Rate must be less than or equal to ${max}%.')
           .required()
@@ -358,7 +402,6 @@ function generateInitialValues(tabs: TabType[]) {
   const initialValues: { [key: string]: number | string }  = {};
   _.forEach(tabs, (tab: TabType) => {
     _.forEach(tab.formFields, (f: FormField) => {
-      // @ts-ignore
       initialValues[f.id] = f.defaultValue;
     })
   });
@@ -405,9 +448,18 @@ const useStyles = makeStyles((theme: Theme) => ({
     color: "grey",
   },
   tabPanel: {
-    minWidth: 125,
-    width: 125,
-    lineHeight: 1.4,
+    [theme.breakpoints.down('sm')]: {
+      minWidth: 140,
+      width: 140,
+      lineHeight: 1.1,
+    },
+    [theme.breakpoints.up('md')]: {
+      minWidth: 140,
+      width: 140,
+      lineHeight: 1.4,
+      paddingTop: theme.spacing(1),
+      paddingBottom: theme.spacing(1),
+    }
   },
 }));
 
@@ -444,70 +496,62 @@ type FormGridProps = {
 };
 
 function FormGrid({ fields, formik }: FormGridProps) {
-  // const handleChangeWrapper = useMemo(
-  //   () => (
-  //     (e: React.ChangeEvent<any>) => {
-  //       // TODO: Can't update querystring any more --> do I even need this custom function?
-  //       formik.handleChange(e);
-  //     }
-  //   ),
-  //   [formik.handleChange]
-  // );
-
-
   const classes = useStyles();
+
   return (
     <Grid container spacing={2}>
-      {_.map(fields, (field: FormField) => (
-        // @ts-ignore
-        <Grid key={field.id} item xs={field.gridWidth}>
-          <TextField
-            id={field.id}
-            label={field.label}
-            type={field.inputType}
-            required={field.required}
-            fullWidth // TODO: Consider styling options
+      {_.map(fields, (field: FormField) => {
+        const ConditionalComponent = field.formatWithCommas ? NumberFieldWithCommas : TextField;
+        
+        return (
+          // @ts-ignore
+          <Grid key={field.id} item xs={12} sm={12} md={field.gridWidth} lg={field.gridWidth} xl={field.gridWidth}>
+            <ConditionalComponent 
+              id={field.id}
+              label={field.label}
+              // TODO: type clashes with react-number-format --> type:	One of ['text', 'tel', 'password']
+              // type={field.inputType}
+              required={field.required}
+              fullWidth // TODO: Consider styling options
 
-            // formik:
-            value={formik.values[field.id]}
-            // TODO: Replace with wrapper function that also updates querystring
-            onChange={formik.handleChange}
-            onBlur={formik.handleBlur} // https://stackoverflow.com/a/57481493
-            error={formik.touched[field.id] && Boolean(formik.errors[field.id])}
-            helperText={formik.touched[field.id] && formik.errors[field.id]}
+              // formik:
+              value={formik.values[field.id]}
+              onChange={formik.handleChange}
+              onBlur={formik.handleBlur} // https://stackoverflow.com/a/57481493
+              error={formik.touched[field.id] && Boolean(formik.errors[field.id])}
+              helperText={formik.touched[field.id] && formik.errors[field.id]}
 
-            // TODO: Need to add comma formatting
-
-            InputLabelProps={{
-              shrink: true,
-            }}
-            InputProps={{
-              startAdornment: (
-                field.startAdornment
-                  ? <InputAdornment position="start">{field.startAdornment}</InputAdornment>
-                  : null
-              ),
-              endAdornment: (
-                field.endAdornment
-                  ? (
-                    <InputAdornment position="start">
-                      {field.endAdornment}
-                      {field.helperText && (
-                        <Tooltip title={<Paragraphs paragraphs={field.helperText}/>}>
-                          <Help fontSize="small" style={{ marginLeft: '5px' }} className={classes.helpIcon} />
-                        </Tooltip>
-                      )}
-                    </InputAdornment>
-                  )
-                  : null
-              ),
-            }}
-            className={classes.number}
-            variant="outlined"
-            size="small"
-          />
-        </Grid>
-      ))}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              InputProps={{
+                startAdornment: (
+                  field.startAdornment
+                    ? <InputAdornment position="start">{field.startAdornment}</InputAdornment>
+                    : null
+                ),
+                endAdornment: (
+                  field.endAdornment
+                    ? (
+                      <InputAdornment position="start">
+                        {field.endAdornment}
+                        {field.helperText && (
+                          <Tooltip title={<Paragraphs paragraphs={field.helperText}/>}>
+                            <Help fontSize="small" style={{ marginLeft: '5px' }} className={classes.helpIcon} />
+                          </Tooltip>
+                        )}
+                      </InputAdornment>
+                    )
+                    : null
+                ),
+              }}
+              className={classes.number}
+              variant="outlined"
+              size="small"
+            />
+          </Grid>
+        );
+      })}
       {/* TODO: Consider adding button to go to next tab here */}
     </Grid>
   );
@@ -522,19 +566,18 @@ function GenericTabs(props: NewGenericTabsProps) {
   const classes = useStyles();
   const theme = useTheme();
   const [value, setValue] = React.useState(0);
-
-  // TODO: is this the right use of useMemo?
   const handleTabChange = useMemo(() => (event: React.ChangeEvent<{}>, newValue: number) => setValue(newValue), []);
 
   return (
     <div>
       <AppBar position="static" color="default">
-        {/* TODO: Consider stepper instead of tabs */}
         <Tabs
           value={value}
           onChange={handleTabChange}
           indicatorColor="secondary"
           textColor="secondary"
+          scrollButtons="off"
+          variant="scrollable"
         >
           {props.tabs.map((tab: TabType, idx) => (
             <Tab key={idx} label={tab.tabTitle} {...a11yProps(idx)} className={classes.tabPanel} />
@@ -579,6 +622,13 @@ function AnalyzePage(props: any) {
           <form>
             <GenericTabs tabs={TABS} formik={formik} />
           </form>
+        </Grid>
+        <Grid item xs={12}>
+          <div>
+            {_.map(formik.values, (k: string, v: string) => {
+              return <p>{`${k}: ${v}`}</p>
+            })}
+          </div>
         </Grid>
       </Grid>
     </Container>
