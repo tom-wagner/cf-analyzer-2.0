@@ -32,9 +32,9 @@ type TabType = {
 function Paragraphs(props: { paragraphs: string[] }) {
   return (
     <>
-      {_.map(props.paragraphs, p => (
+      {_.map(props.paragraphs, (p: string, idx: number) => (
         // TODO: Consider using standard MUI styling
-        <p style={{ fontSize: '0.8rem' }}>
+        <p key={idx} style={{ fontSize: '0.8rem' }}>
           {p}
         </p>
       ))}
@@ -71,7 +71,9 @@ const TABS: TabType[] = [
         required: true,
         defaultValue: '',
         startAdornment: '🏠',
-        validator: yup.string().required(),
+        validator: yup
+        .string()
+        .required(),
       },
       {
         id: 'purchase_price',
@@ -95,7 +97,7 @@ const TABS: TabType[] = [
         label: 'Closing Costs',
         inputType: 'number',
         gridWidth: 3,
-        defaultValue: '',
+        defaultValue: '0',
         startAdornment: '$',
         formatWithCommas: true,
         validator: yup
@@ -231,7 +233,7 @@ const TABS: TabType[] = [
     formFields: [
       {
         id: 'capex_rate',
-        label: 'Capital Expenditures (Capex) Rate',
+        label: 'CapEx Rate',
         inputType: 'number',
         gridWidth: 3,
         required: true,
@@ -239,7 +241,7 @@ const TABS: TabType[] = [
         defaultValue: '5',
         endAdornment: '%',
         helperText: [
-          `Capital Expenditures Rate is calculated as the annual cost of major expenditures
+          `Capital Expenditures (Capex) Rate is calculated as the annual cost of major expenditures
           (ex: replacing the roof, a new water heater, etc.) divided by the gross annual rental
           income. It will vary greatly from property to property depending on age, location, cost
           and other factors.`,
@@ -312,7 +314,7 @@ const TABS: TabType[] = [
           represents the amount charged by the property manager to manage your property.`,
           `Typical property management fees range from 9-12% depending on the market and
           services provided.`,
-          `Enter 0 if you plan on managing your property yourself.`
+          `Enter '0' if you plan on managing your property yourself.`
         ],
         validator: yup
           .number()
@@ -461,6 +463,17 @@ const useStyles = makeStyles((theme: Theme) => ({
       paddingBottom: theme.spacing(1),
     }
   },
+  formGrid: {
+    [theme.breakpoints.down('sm')]: {
+      height: '160px',
+      minHeight: '160px',
+      overflow: 'scroll',
+    },
+    [theme.breakpoints.up('md')]: {
+      height: '95px',
+      minHeight: '95px',
+    }
+  },
 }));
 
 interface TabPanelProps {
@@ -472,6 +485,7 @@ interface TabPanelProps {
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
+  const classes = useStyles();
 
   return (
     <div
@@ -479,6 +493,7 @@ function TabPanel(props: TabPanelProps) {
       hidden={value !== index}
       id={`full-width-tabpanel-${index}`}
       aria-labelledby={`full-width-tab-${index}`}
+      className={classes.formGrid}
       {...other}
     >
       {value === index && (
@@ -611,6 +626,7 @@ function AnalyzePage(props: any) {
 
   useEffect(() => {
     router.history.replace('/analyze?' + stringify(formik.values));
+    formik.validateForm();
   }, [formik.values]);
 
   return (
@@ -625,8 +641,13 @@ function AnalyzePage(props: any) {
         </Grid>
         <Grid item xs={12}>
           <div>
-            {_.map(formik.values, (k: string, v: string) => {
-              return <p>{`${k}: ${v}`}</p>
+            {_.map(formik.values, (v: string, k: string) => {
+              return <p key={k}>{`${k}: ${v}`}</p>
+            })}
+          </div>
+          <div>
+            {_.map(formik.errors, (v: string, k: string) => {
+              return <p key={k}>{`${k}: ${v}`}</p>
             })}
           </div>
         </Grid>
