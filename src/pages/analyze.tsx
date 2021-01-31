@@ -9,6 +9,7 @@ import NumberFormat from "react-number-format";
 import { useFormik } from "formik";
 import { stringify } from "querystring";
 import { useRouter } from "../util/router";
+import { GoogleMaps as GoogleMapsSearchBar } from "../custom_components/google_maps_place";
 
 type FormField = {
   id: string,
@@ -61,13 +62,12 @@ const TABS: TabType[] = [
     tabTitle: 'Purchase Details',
     formFields: [
       // TODO: Integrate with Google Maps API
-      // TODO: Add Validator Functions
-      // TODO: consider adding mobile grid width in conjunction with breakpoints and only use 6 / 12
+      // https://material-ui.com/components/autocomplete/#google-maps-place
       {
         id: 'property_address',
         label: 'Property Address',
         inputType: 'text',
-        gridWidth: 6,
+        gridWidth: 4,
         required: true,
         defaultValue: '',
         startAdornment: '🏠',
@@ -90,20 +90,16 @@ const TABS: TabType[] = [
           .min(0, 'Purchase Price must be greater than or equal to $${min}.')
           .required()
       },
-      // TODO: Consider breaking this out into financed/not financed
-      // TODO: Consider adding helper text to describe closing costs and mention that mortgage points should be included here
+      // TODO: Convert to toggle, then conditionally show more fields
       {
-        id: 'closing_costs',
-        label: 'Closing Costs',
-        inputType: 'number',
-        gridWidth: 3,
-        defaultValue: '0',
-        startAdornment: '$',
-        formatWithCommas: true,
+        id: 'is_rehab',
+        label: 'Rehab?',
+        inputType: 'text',
+        gridWidth: 2,
+        defaultValue: 'No',
         validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Closing Costs must be greater than or equal to $${min}.')
+          .string()
+          .oneOf(['Yes', 'yes', 'No', 'no'], 'Must be either "Yes" or "No"')
       },
     ],
   },
@@ -125,7 +121,7 @@ const TABS: TabType[] = [
         id: 'term',
         label: 'Loan Term',
         inputType: 'number',
-        gridWidth: 3,
+        gridWidth: 2,
         required: true,
         defaultValue: '30',
         endAdornment: 'Years',
@@ -141,9 +137,9 @@ const TABS: TabType[] = [
       },
       {
         id: 'percentage_down',
-        label: 'Down Payment Percentage',
+        label: 'Down Payment',
         inputType: 'number',
-        gridWidth: 3,
+        gridWidth: 2,
         required: true,
         formatWithCommas: true,
         defaultValue: '20',
@@ -154,16 +150,17 @@ const TABS: TabType[] = [
           .min(0, 'Down Payment Percentage must be greater than or equal to ${min}%.')
           .max(100, 'Down Payment Percentage must be less than or equal to ${max}%.')
           .required(),
-        helperText: [
-          `Please note that PMI is not calculated or incorporated into the analysis regardless
-          of the down payment percentage.`,
-        ],
+        // TODO: Do we want this helper text?
+        // helperText: [
+        //   `Please note that PMI is not calculated or incorporated into the analysis regardless
+        //   of the down payment percentage.`,
+        // ],
       },
       {
         id: 'interest_rate',
         label: 'Interest Rate',
         inputType: 'number',
-        gridWidth: 3,
+        gridWidth: 2,
         required: true,
         defaultValue: '2.75',
         formatWithCommas: true,
@@ -174,6 +171,32 @@ const TABS: TabType[] = [
           .min(0, 'Interest Rate must be greater than or equal to ${min}%.')
           .max(100, 'Interest Rate must be less than or equal to ${max}%.')
           .required()
+      },
+      // TODO: Consider breaking this out into financed/not financed
+      // TODO: Consider adding helper text to describe closing costs and mention that mortgage points should be included here
+      {
+        id: 'closing_costs',
+        label: 'Closing Costs',
+        inputType: 'number',
+        gridWidth: 2,
+        defaultValue: '0',
+        startAdornment: '$',
+        formatWithCommas: true,
+        validator: yup
+          .number()
+          .transform(stringToNumberYupTransformer)
+          .min(0, 'Closing Costs must be greater than or equal to $${min}.')
+      },
+      // TODO: Convert to toggle, share component/structure with is_rehab
+      {
+        id: 'closing_costs_financed',
+        label: 'Financing Closing Costs?',
+        inputType: 'text',
+        gridWidth: 4,
+        defaultValue: 'No',
+        validator: yup
+          .string()
+          .oneOf(['Yes', 'yes', 'No', 'no'], 'Must be either "Yes" or "No"')
       },
     ],
   },
@@ -231,6 +254,7 @@ const TABS: TabType[] = [
   {
     tabTitle: 'Variable Expenses',
     formFields: [
+      // TODO: Consider adding post-vacancy toggle
       {
         id: 'capex_rate',
         label: 'CapEx Rate',
@@ -254,6 +278,7 @@ const TABS: TabType[] = [
           .max(100, 'Capex Rate must be less than or equal to ${max}%.')
           .required()
       },
+      // TODO: Consider adding post-vacancy toggle
       {
         id: 'repairs_rate',
         label: 'Repairs & Maintenance Rate',
@@ -300,6 +325,7 @@ const TABS: TabType[] = [
           .max(100, 'Vacancy Rate must be less than or equal to ${max}%.')
           .required()
       },
+      // TODO: Consider adding post-vacancy toggle
       {
         id: 'property_management_rate',
         label: 'Property Management Rate',
@@ -640,6 +666,7 @@ function AnalyzePage(props: any) {
           </form>
         </Grid>
         <Grid item xs={12}>
+          <GoogleMapsSearchBar />
           <div>
             {_.map(formik.values, (v: string, k: string) => {
               return <p key={k}>{`${k}: ${v}`}</p>
