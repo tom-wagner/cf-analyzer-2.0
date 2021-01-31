@@ -5,7 +5,6 @@ import LocationOnIcon from '@material-ui/icons/LocationOn';
 import Grid from '@material-ui/core/Grid';
 import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
-// @ts-ignore --> TODO: Why isn't definitely typed working?
 import parse from 'autosuggest-highlight/parse';
 import throttle from 'lodash/throttle';
 
@@ -44,20 +43,19 @@ interface PlaceType {
   };
 }
 
-// TODO: Figure out how to only return addresses
-// TODO: Figure out to pass in value here from form
-export function GoogleMaps() {
+export function GoogleMaps(props: any) {
   const classes = useStyles();
   const [value, setValue] = React.useState<PlaceType | null>(null);
-  const [inputValue, setInputValue] = React.useState('');
+  const [inputValue, setInputValue] = React.useState('244 Brunswick Street, Jersey City, NJ, USA');
   const [options, setOptions] = React.useState<PlaceType[]>([]);
   const loaded = React.useRef(false);
 
   if (typeof window !== 'undefined' && !loaded.current) {
     if (!document.querySelector('#google-maps')) {
+      console.log('loading script!!');
       loadScript(
-        // TODO: can I set libraries here
-        'https://maps.googleapis.com/maps/api/js?key=AIzaSyCujilT9bq0ukJ_0RRm6Vh1YJNHwgyjxoI&libraries=places',
+        // TODO: Replace with PROD API KEY
+        `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_LOCALHOST_KEY}&libraries=places`,
         document.querySelector('head'),
         'google-maps',
       );
@@ -67,19 +65,67 @@ export function GoogleMaps() {
   }
 
   const fetch = React.useMemo(
-    () =>
-      throttle((request: { input: string }, callback: (results?: PlaceType[]) => void) => {
-        (autocompleteService.current as any).getPlacePredictions(request, callback);
-      }, 200),
+    () => (
+      throttle((request: { input: string }, callback: (results: PlaceType[], status: any) => void) => {
+        console.log("input: ", request.input);
+        (autocompleteService.current as any).getPlacePredictions({ ...request, types: ['address'] }, callback);
+      }, 200)
+    ),
     [],
   );
 
+  // populate from querystring if applicable
+  React.useEffect(() => {
+    console.log('mount!!');
+    let active = true;
+
+    if (!autocompleteService.current && (window as any).google) {
+      // TODO: Async issue here
+      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+    }
+
+    if (!autocompleteService.current) {
+      console.log('exiting!')
+      return undefined;
+    }
+
+    if (inputValue === '') {
+      setOptions(value ? [value] : []);
+      return undefined;
+    }
+    
+    console.log('fetching!!');
+    fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
+      console.log('populating from querystring!');
+      if (active) {
+        let newOptions = [] as PlaceType[];
+
+        if (value) {
+          newOptions = [value];
+        }
+
+        if (results) {
+          newOptions = [...newOptions, ...results];
+        }
+
+        // setOptions(newOptions);
+        setValue(newOptions[0])
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // subsequent queries
   React.useEffect(() => {
     let active = true;
 
     if (!autocompleteService.current && (window as any).google) {
       autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
     }
+
     if (!autocompleteService.current) {
       return undefined;
     }
@@ -89,7 +135,7 @@ export function GoogleMaps() {
       return undefined;
     }
 
-    fetch({ input: inputValue }, (results?: PlaceType[]) => {
+    fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
       if (active) {
         let newOptions = [] as PlaceType[];
 
@@ -122,14 +168,16 @@ export function GoogleMaps() {
       filterSelectedOptions
       value={value}
       onChange={(event: any, newValue: PlaceType | null) => {
+        console.log('New value: ', newValue);
         setOptions(newValue ? [newValue, ...options] : options);
         setValue(newValue);
       }}
       onInputChange={(event, newInputValue) => {
+        console.log('New input value: ', newInputValue);
         setInputValue(newInputValue);
       }}
       renderInput={(params) => (
-        <TextField {...params} label="Add a location" variant="outlined" fullWidth />
+        <TextField {...params} label="Add a location" variant="outlined" fullWidth size="small" />
       )}
       renderOption={(option) => {
         const matches = option.structured_formatting.main_text_matched_substrings;
@@ -144,7 +192,7 @@ export function GoogleMaps() {
               <LocationOnIcon className={classes.icon} />
             </Grid>
             <Grid item xs>
-              {parts.map((part: any, index: number) => (
+              {parts.map((part, index) => (
                 <span key={index} style={{ fontWeight: part.highlight ? 700 : 400 }}>
                   {part.text}
                 </span>
@@ -159,3 +207,4 @@ export function GoogleMaps() {
     />
   );
 }
+
