@@ -74,18 +74,65 @@ export function GoogleMaps(props: any) {
     [],
   );
 
+  // const service = await new (window as any).google.maps.places.AutocompleteService();
+  // console.log({ service });
+
+  // TODO: Consider using this --> https://www.robinwieruch.de/react-hooks-fetch-data
+
+  // PLAN:
+  // 1) kick off AutocompleteService()
+  // 2) loop until 3seconds or autocompleteService.current has a value
+
   // populate from querystring if applicable
   React.useEffect(() => {
+    // TODO: Need to everythig inside an async IIFE() --> see sleep1()
+
     console.log('mount!!');
     let active = true;
 
-    if (!autocompleteService.current && (window as any).google) {
-      // TODO: Async issue here
-      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+    async function sleep1() {
+      console.log("sleep1 start");
+      while (!(window as any).google) {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        console.log('Sleeping...');
+      }
+      console.log("sleep1 done");
+      console.log({ google: (window as any).google });
+
+      if (!autocompleteService.current && (window as any).google) {
+        // TODO: Async issue here --> need to somehow wait for this to initialize
+        // useEffect on mount to set this --> then reference it as
+        autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+        console.log({ ac: autocompleteService.current });
+        // debugger;
+      }
+  
+      async function sleep2() {
+        console.log("sleep start");
+        while (!autocompleteService.current) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          console.log('Sleeping...');
+        }
+        console.log("sleep done");
+        console.log({ ac: autocompleteService.current });
+      }
+      sleep2();
     }
+    sleep1();
+
+    // let i = 0;
+    // block on initialization of service
+    // while (!autocompleteService.current) {
+    //   // consider using promise here to loop every .01 seconds, or whatever length
+    //   sleep();
+    //   i++;
+    //   console.log(i);
+    // }
+
+    console.log('after sleep!', autocompleteService.current);
 
     if (!autocompleteService.current) {
-      console.log('exiting!')
+      console.log('exiting!', autocompleteService.current);
       return undefined;
     }
 
@@ -174,6 +221,7 @@ export function GoogleMaps(props: any) {
       }}
       onInputChange={(event, newInputValue) => {
         console.log('New input value: ', newInputValue);
+        // TODO: Store the property ID in the URL --> parse that in order to populate
         setInputValue(newInputValue);
       }}
       renderInput={(params) => (
