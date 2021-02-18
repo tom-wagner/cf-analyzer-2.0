@@ -7,6 +7,9 @@ import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import parse from 'autosuggest-highlight/parse';
 import throttle from 'lodash/throttle';
+import { FormField } from "../pages/analyze";
+import { InputAdornment } from '@material-ui/core';
+import { PinDropSharp } from '@material-ui/icons';
 
 function loadScript(src: string, position: HTMLElement | null, id: string) {
   if (!position) {
@@ -19,8 +22,6 @@ function loadScript(src: string, position: HTMLElement | null, id: string) {
   script.src = src;
   position.appendChild(script);
 }
-
-const autocompleteService = { current: null };
 
 const useStyles = makeStyles((theme) => ({
   icon: {
@@ -41,28 +42,29 @@ interface PlaceType {
       },
     ];
   };
+  place_id: string;
 }
 
-export function GoogleMaps(props: any) {
+// Note: this need to be outside the component?
+const autocompleteService = { current: null };
+const placesService = { current: null };
+
+function updateQueryString(newValue: PlaceType | null) {
+  // TODO: grab the placeId from the `newValue` and put that in the queryString
+  console.log(`nv.placeId: ${newValue ? newValue.place_id : newValue}`);
+}
+
+// TODO: Can I use this for QS?
+// https://developers.google.com/maps/documentation/javascript/reference/places-service
+
+export function GoogleMaps({ field, formik }: { field: FormField, formik: any }) {
   const classes = useStyles();
   const [value, setValue] = React.useState<PlaceType | null>(null);
+  // TODO: Initialize from querystring?
   const [inputValue, setInputValue] = React.useState('244 Brunswick Street, Jersey City, NJ, USA');
   const [options, setOptions] = React.useState<PlaceType[]>([]);
-  const loaded = React.useRef(false);
 
-  if (typeof window !== 'undefined' && !loaded.current) {
-    if (!document.querySelector('#google-maps')) {
-      console.log('loading script!!');
-      loadScript(
-        // TODO: Replace with PROD API KEY
-        `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_LOCALHOST_KEY}&libraries=places`,
-        document.querySelector('head'),
-        'google-maps',
-      );
-    }
-
-    loaded.current = true;
-  }
+  // TODO: Need to add Powered by Google or Google logo: https://developers.google.com/places/web-service/policies
 
   const fetch = React.useMemo(
     () => (
@@ -74,126 +76,82 @@ export function GoogleMaps(props: any) {
     [],
   );
 
-  // const service = await new (window as any).google.maps.places.AutocompleteService();
-  // console.log({ service });
+  // TODO: This is mounting and unmounting when I change tabs --> may need to move up one component to avoid unmounting issue
+  useEffect(function initializeGoogleMaps () {
+    // https://www.robinwieruch.de/react-hooks-fetch-data
+    // https://material-ui.com/components/autocomplete/#google-maps-place
+    async function init() {
+      loadScript(
+        // TODO: Replace with PROD API KEY
+        `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_LOCALHOST_KEY}&libraries=places`,
+        document.querySelector('head'),
+        'google-maps',
+      );
 
-  // TODO: Consider using this --> https://www.robinwieruch.de/react-hooks-fetch-data
-
-  // PLAN:
-  // 1) kick off AutocompleteService()
-  // 2) loop until 3seconds or autocompleteService.current has a value
-
-  // populate from querystring if applicable
-  React.useEffect(() => {
-    // TODO: Need to everythig inside an async IIFE() --> see sleep1()
-
-    console.log('mount!!');
-    let active = true;
-
-    async function sleep1() {
-      console.log("sleep1 start");
+      // block on initialization of loading Google script
       while (!(window as any).google) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-        console.log('Sleeping...');
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      console.log("sleep1 done");
-      console.log({ google: (window as any).google });
+      // console.log('google initialized: ', (window as any).google);
 
-      if (!autocompleteService.current && (window as any).google) {
-        // TODO: Async issue here --> need to somehow wait for this to initialize
-        // useEffect on mount to set this --> then reference it as
-        autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-        console.log({ ac: autocompleteService.current });
-        // debugger;
+      // block on initialization of AutocompleteService
+      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+      while (autocompleteService.current === null) {
+        console.log('ac service: ', autocompleteService.current);
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-  
-      async function sleep2() {
-        console.log("sleep start");
-        while (!autocompleteService.current) {
-          await new Promise(resolve => setTimeout(resolve, 300));
-          console.log('Sleeping...');
-        }
-        console.log("sleep done");
-        console.log({ ac: autocompleteService.current });
+      // console.log('ac initialized: ', autocompleteService.current, (autocompleteService.current as any).getPlacePredictions);
+
+      placesService.current = new (window as any).google.maps.places.PlacesService(document.createElement('div'));
+      while (placesService.current === null) {
+        console.log('places service: ', placesService.current);
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-      sleep2();
-    }
-    sleep1();
+      // console.log('ac initialized: ', autocompleteService.current, (autocompleteService.current as any).getPlacePredictions);
+      // console.log('places service: ', placesService.current, (placesService.current as any).getDetails);
 
-    // let i = 0;
-    // block on initialization of service
-    // while (!autocompleteService.current) {
-    //   // consider using promise here to loop every .01 seconds, or whatever length
-    //   sleep();
-    //   i++;
-    //   console.log(i);
-    // }
+      // TODO: Add error handling for invalid place id  
+      (placesService.current as any).getDetails({ placeId: field.defaultValue, fields: ['ALL'] }, function cb(res: any[], err: any) {
+        // console.log({ res });
 
-    console.log('after sleep!', autocompleteService.current);
-
-    if (!autocompleteService.current) {
-      console.log('exiting!', autocompleteService.current);
-      return undefined;
-    }
-
-    if (inputValue === '') {
-      setOptions(value ? [value] : []);
-      return undefined;
-    }
-    
-    console.log('fetching!!');
-    fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
-      console.log('populating from querystring!');
-      if (active) {
-        let newOptions = [] as PlaceType[];
-
-        if (value) {
-          newOptions = [value];
-        }
-
-        if (results) {
-          newOptions = [...newOptions, ...results];
-        }
-
-        // setOptions(newOptions);
-        setValue(newOptions[0])
-      }
-    });
-
-    return () => {
-      active = false;
+        // @ts-ignore
+        fetch({ input: res.formatted_address }, (results: PlaceType[], status: any) => {
+          console.log({ results });
+          setValue(results[0]);
+          formik.setFieldValue('property_address', results[0].place_id);
+        });
+      })
     };
+
+    init();
   }, []);
 
   // subsequent queries
   React.useEffect(() => {
     let active = true;
 
-    if (!autocompleteService.current && (window as any).google) {
-      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-    }
+    console.log({ value, inputValue, fetch, autocompleteService, g: (window as any).google });
 
-    if (!autocompleteService.current) {
+    if (!autocompleteService.current || !(window as any).google) {
+      // autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
       return undefined;
     }
-
     if (inputValue === '') {
       setOptions(value ? [value] : []);
       return undefined;
     }
 
     fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
+      // console.log({ results });
       if (active) {
         let newOptions = [] as PlaceType[];
-
         if (value) {
           newOptions = [value];
         }
-
         if (results) {
+          // setValue(results[0])
           newOptions = [...newOptions, ...results];
         }
-
         setOptions(newOptions);
       }
     });
@@ -206,7 +164,6 @@ export function GoogleMaps(props: any) {
   return (
     <Autocomplete
       id="google-map-demo"
-      style={{ width: 300 }}
       getOptionLabel={(option) => (typeof option === 'string' ? option : option.description)}
       filterOptions={(x) => x}
       options={options}
@@ -215,17 +172,57 @@ export function GoogleMaps(props: any) {
       filterSelectedOptions
       value={value}
       onChange={(event: any, newValue: PlaceType | null) => {
-        console.log('New value: ', newValue);
         setOptions(newValue ? [newValue, ...options] : options);
         setValue(newValue);
+
+        // TODO: Replace this with function that updates QS
+        // updateQueryString(newValue);
+        // TODO: Tie to TABS constant
+        // TODO: newValue can be null, thus we need the ternary
+        formik.setFieldValue('property_address', newValue ? newValue.place_id : newValue);
       }}
       onInputChange={(event, newInputValue) => {
-        console.log('New input value: ', newInputValue);
-        // TODO: Store the property ID in the URL --> parse that in order to populate
         setInputValue(newInputValue);
       }}
       renderInput={(params) => (
-        <TextField {...params} label="Add a location" variant="outlined" fullWidth size="small" />
+        <TextField
+          // TODO: Do I need these params
+          {...params}
+          label="Property Address"
+          size="small"
+          variant="outlined"
+          fullWidth
+          required={field.required}
+          onBlur={formik.handleBlur} // https://stackoverflow.com/a/57481493
+          // TODO: Errors are not working
+          error={formik.touched[field.id] && Boolean(formik.errors[field.id])}
+          helperText={formik.touched[field.id] && formik.errors[field.id]}
+
+          // TODO: Add the ability to disable and set spinner while the API calls fire
+
+          // TODO: How can I share this code with the code in Analyze
+          // InputProps={{
+          //   startAdornment: (
+          //     field.startAdornment
+          //       ? <InputAdornment position="start">{field.startAdornment}</InputAdornment>
+          //       : null
+          //   ),
+          //   endAdornment: (
+          //     field.endAdornment
+          //       ? (
+          //         <InputAdornment position="start">
+          //           {field.endAdornment}
+          //           {field.helperText && (
+          //             <Tooltip title={<Paragraphs paragraphs={field.helperText}/>}>
+          //               <Help fontSize="small" style={{ marginLeft: '5px' }} className={classes.helpIcon} />
+          //             </Tooltip>
+          //           )}
+          //         </InputAdornment>
+          //       )
+          //       : null
+          //   ),
+          // }}
+        />
       )}
       renderOption={(option) => {
         const matches = option.structured_formatting.main_text_matched_substrings;

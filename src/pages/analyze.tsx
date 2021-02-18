@@ -11,7 +11,7 @@ import { stringify } from "querystring";
 import { useRouter } from "../util/router";
 import { GoogleMaps as GoogleMapsSearchBar } from "../custom_components/google_maps_place";
 
-type FormField = {
+export type FormField = {
   id: string,
   label: string,
   inputType: string,
@@ -69,7 +69,7 @@ const TABS: TabType[] = [
         inputType: 'text',
         gridWidth: 4,
         required: true,
-        defaultValue: '',
+        defaultValue: 'ChIJp3vUuUtXwokRkjX5wUo83w8',
         startAdornment: '🏠',
         validator: yup
         .string()
@@ -542,54 +542,69 @@ function FormGrid({ fields, formik }: FormGridProps) {
   return (
     <Grid container spacing={2}>
       {_.map(fields, (field: FormField) => {
+        // TODO: Start here, sub in this component, pass down custom QS change function
+        // make it match the other components in terms of style
+        // if (field.id === TABS[0].formFields[0].id) {
+        //   return <GoogleMapsSearchBar />
+        // }
+
+        // TODO: Start here, sub in this component, pass down custom QS change function
+        // make it match the other components in terms of style
+        const shouldRenderGoogleMapsAutocomplete = (field.id === TABS[0].formFields[0].id);
+        
         const ConditionalComponent = field.formatWithCommas ? NumberFieldWithCommas : TextField;
         
         return (
           // @ts-ignore
           <Grid key={field.id} item xs={12} sm={12} md={field.gridWidth} lg={field.gridWidth} xl={field.gridWidth}>
-            <ConditionalComponent 
-              id={field.id}
-              label={field.label}
-              // TODO: type clashes with react-number-format --> type:	One of ['text', 'tel', 'password']
-              // type={field.inputType}
-              required={field.required}
-              fullWidth // TODO: Consider styling options
+            {shouldRenderGoogleMapsAutocomplete && (
+              <GoogleMapsSearchBar field={field} formik={formik} />
+            )}
+            {!shouldRenderGoogleMapsAutocomplete && (
+              <ConditionalComponent 
+                id={field.id}
+                label={field.label}
+                // TODO: type clashes with react-number-format --> type:	One of ['text', 'tel', 'password']
+                // type={field.inputType}
+                required={field.required}
+                fullWidth // TODO: Consider styling options
 
-              // formik:
-              value={formik.values[field.id]}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur} // https://stackoverflow.com/a/57481493
-              error={formik.touched[field.id] && Boolean(formik.errors[field.id])}
-              helperText={formik.touched[field.id] && formik.errors[field.id]}
+                // formik:
+                value={formik.values[field.id]}
+                onChange={formik.handleChange}
+                onBlur={formik.handleBlur} // https://stackoverflow.com/a/57481493
+                error={formik.touched[field.id] && Boolean(formik.errors[field.id])}
+                helperText={formik.touched[field.id] && formik.errors[field.id]}
 
-              InputLabelProps={{
-                shrink: true,
-              }}
-              InputProps={{
-                startAdornment: (
-                  field.startAdornment
-                    ? <InputAdornment position="start">{field.startAdornment}</InputAdornment>
-                    : null
-                ),
-                endAdornment: (
-                  field.endAdornment
-                    ? (
-                      <InputAdornment position="start">
-                        {field.endAdornment}
-                        {field.helperText && (
-                          <Tooltip title={<Paragraphs paragraphs={field.helperText}/>}>
-                            <Help fontSize="small" style={{ marginLeft: '5px' }} className={classes.helpIcon} />
-                          </Tooltip>
-                        )}
-                      </InputAdornment>
-                    )
-                    : null
-                ),
-              }}
-              className={classes.number}
-              variant="outlined"
-              size="small"
-            />
+                InputLabelProps={{
+                  shrink: true,
+                }}
+                InputProps={{
+                  startAdornment: (
+                    field.startAdornment
+                      ? <InputAdornment position="start">{field.startAdornment}</InputAdornment>
+                      : null
+                  ),
+                  endAdornment: (
+                    field.endAdornment
+                      ? (
+                        <InputAdornment position="start">
+                          {field.endAdornment}
+                          {field.helperText && (
+                            <Tooltip title={<Paragraphs paragraphs={field.helperText}/>}>
+                              <Help fontSize="small" style={{ marginLeft: '5px' }} className={classes.helpIcon} />
+                            </Tooltip>
+                          )}
+                        </InputAdornment>
+                      )
+                      : null
+                  ),
+                }}
+                className={classes.number}
+                variant="outlined"
+                size="small"
+              />            
+            )}
           </Grid>
         );
       })}
@@ -666,7 +681,7 @@ function AnalyzePage(props: any) {
           </form>
         </Grid>
         <Grid item xs={12}>
-          <GoogleMapsSearchBar />
+          {/* <GoogleMapsSearchBar /> */}
           <div>
             {_.map(formik.values, (v: string, k: string) => {
               return <p key={k}>{`${k}: ${v}`}</p>
