@@ -41,6 +41,14 @@ function App(props: any) {
             {/* <Route exact={false} strict={false} path={"/^\/analyze\/.*$/"} component={AnalyzePage} /> */}
             <Route exact path="/analyze" component={AnalyzePage} />
 
+            <Route
+              path='/how-i-bought-a-1.5mm-fourplex-with-60000-down'
+              component={() => { 
+                window.location.href = 'https://twitter.com/twbuilds/status/1332807426056335366'; 
+                return null;
+              }}
+            />
+
             {/* <Route
               exact
               path="/firebase-action"
