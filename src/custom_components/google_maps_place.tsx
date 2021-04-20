@@ -9,7 +9,8 @@ import parse from 'autosuggest-highlight/parse';
 import throttle from 'lodash/throttle';
 import { FormField } from "../pages/analyze";
 import { InputAdornment } from '@material-ui/core';
-import { PinDropSharp } from '@material-ui/icons';
+import { FormatItalic, PinDropSharp } from '@material-ui/icons';
+import _ from 'lodash';
 
 function loadScript(src: string, position: HTMLElement | null, id: string) {
   if (!position) {
@@ -45,6 +46,35 @@ interface PlaceType {
   place_id: string;
 }
 
+// FOR OFFLINE TESTING:
+function stubGoogleAPI() {
+  return {
+    // detailsObj: { placeId: field.defaultValue, fields: ['ALL'] }
+    getDetails: (detailsObj: { placeId: String, fields: String[] }, callback: Function) => {
+      callback();
+    },
+  }
+}
+
+function stubOptions(): PlaceType[] {
+  return _.map(_.range(0, 9), x => {
+    return {
+      description: `${Math.floor(Math.random() * 1000)} ${Math.floor(Math.random() * 100000) % 2 === 0 ? 'Brunswick' : 'Blackstone'} ${Math.floor(Math.random() * 100000) % 2 === 0 ? 'Ave.' : 'St.'}`,
+      structured_formatting: {
+        main_text: `${Math.floor(Math.random() * 100000)}`,
+        secondary_text: 'A nice house',
+        main_text_matched_substrings: [
+          {
+            offset: 12,
+            length: 17,
+          },
+        ],
+      },
+      place_id: `${Math.floor(Math.random() * 100000)}`,
+    };
+  });
+}
+
 // Note: this need to be outside the component?
 const autocompleteService = { current: null };
 const placesService = { current: null };
@@ -61,20 +91,34 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
   const classes = useStyles();
   const [value, setValue] = React.useState<PlaceType | null>(null);
   // TODO: Initialize from querystring?
-  const [inputValue, setInputValue] = React.useState('244 Brunswick Street, Jersey City, NJ, USA');
+  const [inputValue, setInputValue] = React.useState('');
   const [options, setOptions] = React.useState<PlaceType[]>([]);
 
   // TODO: Need to add Powered by Google or Google logo: https://developers.google.com/places/web-service/policies
 
+  // COMMENTED OUT FROM PLANE:
+  // const fetch = React.useMemo(
+  //   () => (
+  //     throttle((request: { input: string }, callback: (results: PlaceType[], status: any) => void) => {
+  //       console.log("input: ", request.input);
+  //       (autocompleteService.current as any).getPlacePredictions({ ...request, types: ['address'] }, callback);
+  //     }, 200)
+  //   ),
+  //   [],
+  // );
+
   const fetch = React.useMemo(
     () => (
-      throttle((request: { input: string }, callback: (results: PlaceType[], status: any) => void) => {
-        console.log("input: ", request.input);
-        (autocompleteService.current as any).getPlacePredictions({ ...request, types: ['address'] }, callback);
-      }, 200)
+      // throttle((request: { input: string }, callback: (results: PlaceType[], status: any) => void) => {
+      //   console.log("input: ", request.input);
+      //   (autocompleteService.current as any).getPlacePredictions({ ...request, types: ['address'] }, callback);
+      // }, 200)
+      null
     ),
     [],
   );
+
+  console.log({ value });
 
   // TODO: This is mounting and unmounting when I change tabs --> may need to move up one component to avoid unmounting issue
   useEffect(function initializeGoogleMaps () {
@@ -89,20 +133,25 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
       );
 
       // block on initialization of loading Google script
-      while (!(window as any).google) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // while (!(window as any).google) {
+      //   await new Promise(resolve => setTimeout(resolve, 100));
+      // }
       // console.log('google initialized: ', (window as any).google);
 
       // block on initialization of AutocompleteService
-      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-      while (autocompleteService.current === null) {
-        console.log('ac service: ', autocompleteService.current);
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      // COMMENTED OUT ON PLANE
+      // autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+      // while (autocompleteService.current === null) {
+      //   console.log('ac service: ', autocompleteService.current);
+      //   await new Promise(resolve => setTimeout(resolve, 100));
+      // }
       // console.log('ac initialized: ', autocompleteService.current, (autocompleteService.current as any).getPlacePredictions);
 
-      placesService.current = new (window as any).google.maps.places.PlacesService(document.createElement('div'));
+      // INITIALIZE PLACES SERVICE
+      // BEFORE FLIGHT:
+      // placesService.current = new (window as any).google.maps.places.PlacesService(document.createElement('div'));
+      // @ts-ignore
+      placesService.current = stubGoogleAPI();
       while (placesService.current === null) {
         console.log('places service: ', placesService.current);
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -110,16 +159,25 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
       // console.log('ac initialized: ', autocompleteService.current, (autocompleteService.current as any).getPlacePredictions);
       // console.log('places service: ', placesService.current, (placesService.current as any).getDetails);
 
-      // TODO: Add error handling for invalid place id  
+      // TODO: Add error handling for invalid place id
+      // TODO: Is the any[] type correct for `res`
+
+      console.log('FV VALUE:' + formik.values.property_address);
+
       (placesService.current as any).getDetails({ placeId: field.defaultValue, fields: ['ALL'] }, function cb(res: any[], err: any) {
         // console.log({ res });
 
         // @ts-ignore
-        fetch({ input: res.formatted_address }, (results: PlaceType[], status: any) => {
-          console.log({ results });
-          setValue(results[0]);
-          formik.setFieldValue('property_address', results[0].place_id);
-        });
+        // CODE BEFORE FLIGHT:
+        // fetch({ input: res.formatted_address }, (results: PlaceType[], status: any) => {
+        //   console.log({ results });
+        //   setValue(results[0]);
+        //   formik.setFieldValue('property_address', results[0].place_id);
+        // });
+
+        // FROM PLANE:
+        // setValue(`${Math.floor(Math.random() * 1000)} ${Math.random() % 2 === 0 ? 'Brunswick' : 'Blackstone'} ${Math.random() % 2 === 0 ? 'Ave.' : 'St.'}`);
+        formik.setFieldValue('property_address', `${Math.floor(Math.random() * 100000)}`);
       })
     };
 
@@ -132,29 +190,33 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
 
     console.log({ value, inputValue, fetch, autocompleteService, g: (window as any).google });
 
-    if (!autocompleteService.current || !(window as any).google) {
-      // autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-      return undefined;
-    }
+    // COMMENTED OUT ON PLANE
+    // if (!autocompleteService.current || !(window as any).google) {
+    //   // autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+    //   return undefined;
+    // }
     if (inputValue === '') {
       setOptions(value ? [value] : []);
       return undefined;
     }
 
-    fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
-      // console.log({ results });
-      if (active) {
-        let newOptions = [] as PlaceType[];
-        if (value) {
-          newOptions = [value];
-        }
-        if (results) {
-          // setValue(results[0])
-          newOptions = [...newOptions, ...results];
-        }
-        setOptions(newOptions);
-      }
-    });
+    // BEFORE FLIGHT
+    // fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
+    //   // console.log({ results });
+    //   if (active) {
+    //     let newOptions = [] as PlaceType[];
+    //     if (value) {
+    //       newOptions = [value];
+    //     }
+    //     if (results) {
+    //       // setValue(results[0])
+    //       newOptions = [...newOptions, ...results];
+    //     }
+    //     setOptions(newOptions);
+    //   }
+    // });
+
+    setOptions(stubOptions());
 
     return () => {
       active = false;
@@ -172,6 +234,7 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
       filterSelectedOptions
       value={value}
       onChange={(event: any, newValue: PlaceType | null) => {
+        console.log({ newValue });
         setOptions(newValue ? [newValue, ...options] : options);
         setValue(newValue);
 
@@ -179,7 +242,9 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
         // updateQueryString(newValue);
         // TODO: Tie to TABS constant
         // TODO: newValue can be null, thus we need the ternary
+        // TODO: What is the difference between these two functions? Shouldn't need both most likely
         formik.setFieldValue('property_address', newValue ? newValue.place_id : newValue);
+        formik.handleChange(event);
       }}
       onInputChange={(event, newInputValue) => {
         setInputValue(newInputValue);

@@ -7,7 +7,7 @@ import { Help } from "@material-ui/icons";
 import * as yup from "yup";
 import NumberFormat from "react-number-format";
 import { useFormik } from "formik";
-import { stringify } from "querystring";
+import { stringify, parse } from "querystring";
 import { useRouter } from "../util/router";
 import { GoogleMaps as GoogleMapsSearchBar } from "../custom_components/google_maps_place";
 
@@ -75,6 +75,7 @@ const TABS: TabType[] = [
         .string()
         .required(),
       },
+      // TODO: Purchase price not populating from querystring
       {
         id: 'purchase_price',
         label: 'Purchase Price',
@@ -426,11 +427,16 @@ const TABS: TabType[] = [
   },
 ];
 
-function generateInitialValues(tabs: TabType[]) {
+function generateInitialValues(tabs: TabType[], router: any, validationSchema: any) {
   const initialValues: { [key: string]: number | string }  = {};
   _.forEach(tabs, (tab: TabType) => {
     _.forEach(tab.formFields, (f: FormField) => {
-      initialValues[f.id] = f.defaultValue;
+      initialValues[f.id] = (
+        // TODO: This is broken --> Maybe formik.validateField() or something?
+        (typeof validationSchema[f.id] === 'function' && validationSchema[f.id](router.query[f.id]))
+          ? router.query[f.id]
+          : f.defaultValue
+      );
     })
   });
   return initialValues;
@@ -657,8 +663,9 @@ function AnalyzePage(props: any) {
   const classes = useStyles();
   const router = useRouter();
 
+  // TODO: Should this be in a useEffect()?
   const formik = useFormik({
-    initialValues: generateInitialValues(TABS),
+    initialValues: generateInitialValues(TABS, router, validationSchema),
     validationSchema,
     onSubmit: v => console.log(v),
     // TODO: Figure out validation
