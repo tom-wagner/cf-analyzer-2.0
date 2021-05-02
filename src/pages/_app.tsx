@@ -14,7 +14,28 @@ import "./../util/analytics.ts";
 // import { AuthProvider } from "./../util/auth";
 import { ThemeProvider } from "./../util/theme";
 
+function loadScript(src: string, position: HTMLElement | null, id: string) {
+  if (!position) {
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.setAttribute('async', '');
+  script.setAttribute('id', id);
+  script.src = src;
+  position.appendChild(script);
+}
+
 function App(props: any) {
+  useEffect(() => {
+    loadScript(
+      // TODO: Replace with PROD API KEY
+      `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_LOCALHOST_KEY}&libraries=places`,
+      document.querySelector('head'),
+      'google-maps',
+    );
+  }, [])
+
   return (
     // {/* TODO: Consider using Globals for styling */}
     <ThemeProvider>

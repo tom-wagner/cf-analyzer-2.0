@@ -7,22 +7,8 @@ import Typography from '@material-ui/core/Typography';
 import { makeStyles } from '@material-ui/core/styles';
 import parse from 'autosuggest-highlight/parse';
 import throttle from 'lodash/throttle';
-import { FormField } from "../pages/analyze";
-import { InputAdornment } from '@material-ui/core';
-import { FormatItalic, PinDropSharp } from '@material-ui/icons';
 import _ from 'lodash';
-
-function loadScript(src: string, position: HTMLElement | null, id: string) {
-  if (!position) {
-    return;
-  }
-
-  const script = document.createElement('script');
-  script.setAttribute('async', '');
-  script.setAttribute('id', id);
-  script.src = src;
-  position.appendChild(script);
-}
+import { FormField } from '../constants/analyzeFormFields';
 
 const useStyles = makeStyles((theme) => ({
   icon: {
@@ -46,139 +32,65 @@ interface PlaceType {
   place_id: string;
 }
 
-// FOR OFFLINE TESTING:
-function stubGoogleAPI() {
-  return {
-    // detailsObj: { placeId: field.defaultValue, fields: ['ALL'] }
-    getDetails: (detailsObj: { placeId: String, fields: String[] }, callback: Function) => {
-      callback();
-    },
-  }
-}
-
-function stubOptions(): PlaceType[] {
-  return _.map(_.range(0, 9), x => {
-    return {
-      description: `${Math.floor(Math.random() * 1000)} ${Math.floor(Math.random() * 100000) % 2 === 0 ? 'Brunswick' : 'Blackstone'} ${Math.floor(Math.random() * 100000) % 2 === 0 ? 'Ave.' : 'St.'}`,
-      structured_formatting: {
-        main_text: `${Math.floor(Math.random() * 100000)}`,
-        secondary_text: 'A nice house',
-        main_text_matched_substrings: [
-          {
-            offset: 12,
-            length: 17,
-          },
-        ],
-      },
-      place_id: `${Math.floor(Math.random() * 100000)}`,
-    };
-  });
-}
-
-// Note: this need to be outside the component?
+// Note: this needs to be outside the component
 const autocompleteService = { current: null };
 const placesService = { current: null };
-
-function updateQueryString(newValue: PlaceType | null) {
-  // TODO: grab the placeId from the `newValue` and put that in the queryString
-  console.log(`nv.placeId: ${newValue ? newValue.place_id : newValue}`);
-}
-
-// TODO: Can I use this for QS?
-// https://developers.google.com/maps/documentation/javascript/reference/places-service
 
 export function GoogleMaps({ field, formik }: { field: FormField, formik: any }) {
   const classes = useStyles();
   const [value, setValue] = React.useState<PlaceType | null>(null);
-  // TODO: Initialize from querystring?
   const [inputValue, setInputValue] = React.useState('');
   const [options, setOptions] = React.useState<PlaceType[]>([]);
 
   // TODO: Need to add Powered by Google or Google logo: https://developers.google.com/places/web-service/policies
 
-  // COMMENTED OUT FROM PLANE:
-  // const fetch = React.useMemo(
-  //   () => (
-  //     throttle((request: { input: string }, callback: (results: PlaceType[], status: any) => void) => {
-  //       console.log("input: ", request.input);
-  //       (autocompleteService.current as any).getPlacePredictions({ ...request, types: ['address'] }, callback);
-  //     }, 200)
-  //   ),
-  //   [],
-  // );
-
   const fetch = React.useMemo(
     () => (
-      // throttle((request: { input: string }, callback: (results: PlaceType[], status: any) => void) => {
-      //   console.log("input: ", request.input);
-      //   (autocompleteService.current as any).getPlacePredictions({ ...request, types: ['address'] }, callback);
-      // }, 200)
-      null
+      throttle((request: { input: string }, callback: (results: PlaceType[], status: any) => void) => {
+        console.log("input: ", request.input);
+        (autocompleteService.current as any).getPlacePredictions({ ...request, types: ['address'] }, callback);
+      }, 200)
     ),
     [],
   );
 
-  console.log({ value });
-
-  // TODO: This is mounting and unmounting when I change tabs --> may need to move up one component to avoid unmounting issue
+  // initial page load
   useEffect(function initializeGoogleMaps () {
+    // Design-pattern inspiration:
     // https://www.robinwieruch.de/react-hooks-fetch-data
+    
+    // Google Maps MUI docs:
     // https://material-ui.com/components/autocomplete/#google-maps-place
+    
     async function init() {
-      loadScript(
-        // TODO: Replace with PROD API KEY
-        `https://maps.googleapis.com/maps/api/js?key=${process.env.REACT_APP_GOOGLE_LOCALHOST_KEY}&libraries=places`,
-        document.querySelector('head'),
-        'google-maps',
-      );
-
       // block on initialization of loading Google script
-      // while (!(window as any).google) {
-      //   await new Promise(resolve => setTimeout(resolve, 100));
-      // }
-      // console.log('google initialized: ', (window as any).google);
-
-      // block on initialization of AutocompleteService
-      // COMMENTED OUT ON PLANE
-      // autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-      // while (autocompleteService.current === null) {
-      //   console.log('ac service: ', autocompleteService.current);
-      //   await new Promise(resolve => setTimeout(resolve, 100));
-      // }
-      // console.log('ac initialized: ', autocompleteService.current, (autocompleteService.current as any).getPlacePredictions);
-
-      // INITIALIZE PLACES SERVICE
-      // BEFORE FLIGHT:
-      // placesService.current = new (window as any).google.maps.places.PlacesService(document.createElement('div'));
-      // @ts-ignore
-      placesService.current = stubGoogleAPI();
-      while (placesService.current === null) {
-        console.log('places service: ', placesService.current);
+      while (!(window as any).google) {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-      // console.log('ac initialized: ', autocompleteService.current, (autocompleteService.current as any).getPlacePredictions);
-      // console.log('places service: ', placesService.current, (placesService.current as any).getDetails);
 
-      // TODO: Add error handling for invalid place id
-      // TODO: Is the any[] type correct for `res`
+      // block on initialization of AutocompleteService
+      autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
+      while (autocompleteService.current === null) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
-      console.log('FV VALUE:' + formik.values.property_address);
+      // block on initialization of placesService
+      placesService.current = new (window as any).google.maps.places.PlacesService(document.createElement('div'));
+      while (placesService.current === null) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
-      (placesService.current as any).getDetails({ placeId: field.defaultValue, fields: ['ALL'] }, function cb(res: any[], err: any) {
-        // console.log({ res });
-
-        // @ts-ignore
-        // CODE BEFORE FLIGHT:
-        // fetch({ input: res.formatted_address }, (results: PlaceType[], status: any) => {
-        //   console.log({ results });
-        //   setValue(results[0]);
-        //   formik.setFieldValue('property_address', results[0].place_id);
-        // });
-
-        // FROM PLANE:
-        // setValue(`${Math.floor(Math.random() * 1000)} ${Math.random() % 2 === 0 ? 'Brunswick' : 'Blackstone'} ${Math.random() % 2 === 0 ? 'Ave.' : 'St.'}`);
-        formik.setFieldValue('property_address', `${Math.floor(Math.random() * 100000)}`);
-      })
+      (placesService.current as any).getDetails({ placeId: formik.values.property_address, fields: ['ALL'] }, function cb(res: any[], err: any) {
+        if (!_.isNull(res)) {
+          // @ts-ignore
+          fetch({ input: res.formatted_address }, (results: PlaceType[], status: any) => {
+            setValue(results[0]);
+            formik.setFieldValue('property_address', results[0].place_id);
+          });
+        } else {
+          formik.setFieldValue('property_address', '');
+        }
+      });
     };
 
     init();
@@ -188,35 +100,28 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
   React.useEffect(() => {
     let active = true;
 
-    console.log({ value, inputValue, fetch, autocompleteService, g: (window as any).google });
-
-    // COMMENTED OUT ON PLANE
-    // if (!autocompleteService.current || !(window as any).google) {
-    //   // autocompleteService.current = new (window as any).google.maps.places.AutocompleteService();
-    //   return undefined;
-    // }
+    // TODO: Document purpose of this if statement
+    if (!autocompleteService.current || !(window as any).google) {
+      return undefined;
+    }
+    // TODO: Document purpose of this if statement
     if (inputValue === '') {
       setOptions(value ? [value] : []);
       return undefined;
     }
 
-    // BEFORE FLIGHT
-    // fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
-    //   // console.log({ results });
-    //   if (active) {
-    //     let newOptions = [] as PlaceType[];
-    //     if (value) {
-    //       newOptions = [value];
-    //     }
-    //     if (results) {
-    //       // setValue(results[0])
-    //       newOptions = [...newOptions, ...results];
-    //     }
-    //     setOptions(newOptions);
-    //   }
-    // });
-
-    setOptions(stubOptions());
+    fetch({ input: inputValue }, (results: PlaceType[], status: any) => {
+      if (active) {
+        let newOptions = [] as PlaceType[];
+        if (value) {
+          newOptions = [value];
+        }
+        if (results) {
+          newOptions = [...newOptions, ...results];
+        }
+        setOptions(newOptions);
+      }
+    });
 
     return () => {
       active = false;
@@ -234,7 +139,6 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
       filterSelectedOptions
       value={value}
       onChange={(event: any, newValue: PlaceType | null) => {
-        console.log({ newValue });
         setOptions(newValue ? [newValue, ...options] : options);
         setValue(newValue);
 
@@ -264,6 +168,8 @@ export function GoogleMaps({ field, formik }: { field: FormField, formik: any })
           helperText={formik.touched[field.id] && formik.errors[field.id]}
 
           // TODO: Add the ability to disable and set spinner while the API calls fire
+
+          // TODO: WHY DO I NEED INPUTPROPS?
 
           // TODO: How can I share this code with the code in Analyze
           // InputProps={{

@@ -7,28 +7,10 @@ import { Help } from "@material-ui/icons";
 import * as yup from "yup";
 import NumberFormat from "react-number-format";
 import { useFormik } from "formik";
-import { stringify, parse } from "querystring";
-import { useRouter } from "../util/router";
+import qs from "querystring";
+import { Router, useRouter } from "../util/router";
 import { GoogleMaps as GoogleMapsSearchBar } from "../custom_components/google_maps_place";
-
-export type FormField = {
-  id: string,
-  label: string,
-  inputType: string,
-  gridWidth: number,
-  defaultValue: number | string,
-  required?: boolean,
-  startAdornment?: string,
-  endAdornment?: string,
-  helperText?: string[],
-  formatWithCommas?: boolean,
-  validator?: yup.BaseSchema,
-};
-
-type TabType = {
-  tabTitle: string,
-  formFields: FormField[],
-}
+import { FormField, TabType, TABS } from "../constants/analyzeFormFields";
 
 function Paragraphs(props: { paragraphs: string[] }) {
   return (
@@ -54,391 +36,47 @@ function NumberFieldWithCommas(props: any) {
   );
 }
 
-const stringToNumberYupTransformer = (_: any, val: any) => parseInt(val.replace(/,/, ''));
+// const FIELDS_TO_CONVERT_STRING_TO_NUMBER = new Set([
+//   'purchase_price',
+//   'monthly_rent',
+//   'annual_taxes',
+//   'monthly_insurance',
+//   'closing_costs',
+// ]);
+// function getQueryStringValueById(id: string, router: any) {
+//   if (FIELDS_TO_CONVERT_STRING_TO_NUMBER.has(id)) {
+//     const numericValue = parseFloat(router.query[id].replace(/,/g, ''))
+//     // console.log('id: ', id, 'numericValue: ', numericValue, 'q: ', router.query[id]);
+//     return numericValue;
+//   }
 
-const TABS: TabType[] = [
-  // TODO: Consider allowing users to populate certain fields this from saved settings
-  {
-    tabTitle: 'Purchase Details',
-    formFields: [
-      // TODO: Integrate with Google Maps API
-      // https://material-ui.com/components/autocomplete/#google-maps-place
-      {
-        id: 'property_address',
-        label: 'Property Address',
-        inputType: 'text',
-        gridWidth: 4,
-        required: true,
-        defaultValue: 'ChIJp3vUuUtXwokRkjX5wUo83w8',
-        startAdornment: '🏠',
-        validator: yup
-        .string()
-        .required(),
-      },
-      // TODO: Purchase price not populating from querystring
-      {
-        id: 'purchase_price',
-        label: 'Purchase Price',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        defaultValue: '',
-        startAdornment: '$',
-        formatWithCommas: true,
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Purchase Price must be greater than or equal to $${min}.')
-          .required()
-      },
-      // TODO: Convert to toggle, then conditionally show more fields
-      {
-        id: 'is_rehab',
-        label: 'Rehab?',
-        inputType: 'text',
-        gridWidth: 2,
-        defaultValue: 'No',
-        validator: yup
-          .string()
-          .oneOf(['Yes', 'yes', 'No', 'no'], 'Must be either "Yes" or "No"')
-      },
-    ],
-  },
-  {
-    tabTitle: 'Loan Details',
-    formFields: [
-      // TODO: Consider adding as buttons or dropdown later
-      // {
-      //   id: 'loan_type',
-      //   label: 'Loan Type',
-      //   inputType: 'text',
-      //   gridWidth: 3,
-      //   defaultValue: '',
-      //   required: true,
-      //   validator: yup.string().required(),
-      // },
-      // TODO: Maybe remove or make radio buttons
-      {
-        id: 'term',
-        label: 'Loan Term',
-        inputType: 'number',
-        gridWidth: 2,
-        required: true,
-        defaultValue: '30',
-        endAdornment: 'Years',
-        formatWithCommas: true,
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .test({
-            test: (v: any) => v === 30 || v === 15,
-            message: 'Term must be either 15 or 30 years'
-          })
-          .required()
-      },
-      {
-        id: 'percentage_down',
-        label: 'Down Payment',
-        inputType: 'number',
-        gridWidth: 2,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '20',
-        endAdornment: '%',
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Down Payment Percentage must be greater than or equal to ${min}%.')
-          .max(100, 'Down Payment Percentage must be less than or equal to ${max}%.')
-          .required(),
-        // TODO: Do we want this helper text?
-        // helperText: [
-        //   `Please note that PMI is not calculated or incorporated into the analysis regardless
-        //   of the down payment percentage.`,
-        // ],
-      },
-      {
-        id: 'interest_rate',
-        label: 'Interest Rate',
-        inputType: 'number',
-        gridWidth: 2,
-        required: true,
-        defaultValue: '2.75',
-        formatWithCommas: true,
-        endAdornment: '%',
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Interest Rate must be greater than or equal to ${min}%.')
-          .max(100, 'Interest Rate must be less than or equal to ${max}%.')
-          .required()
-      },
-      // TODO: Consider breaking this out into financed/not financed
-      // TODO: Consider adding helper text to describe closing costs and mention that mortgage points should be included here
-      {
-        id: 'closing_costs',
-        label: 'Closing Costs',
-        inputType: 'number',
-        gridWidth: 2,
-        defaultValue: '0',
-        startAdornment: '$',
-        formatWithCommas: true,
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Closing Costs must be greater than or equal to $${min}.')
-      },
-      // TODO: Convert to toggle, share component/structure with is_rehab
-      {
-        id: 'closing_costs_financed',
-        label: 'Financing Closing Costs?',
-        inputType: 'text',
-        gridWidth: 4,
-        defaultValue: 'No',
-        validator: yup
-          .string()
-          .oneOf(['Yes', 'yes', 'No', 'no'], 'Must be either "Yes" or "No"')
-      },
-    ],
-  },
-  {
-    tabTitle: 'Fixed Income and Expenses',
-    formFields: [
-      {
-        id: 'monthly_rent',
-        label: 'Monthly Rent',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        defaultValue: '',
-        startAdornment: '$',
-        formatWithCommas: true,
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Monthly Rent must be greater than or equal to $${min}.')
-          .required()
-      },
-      // TODO: This needs to be a dollar amount or tied to dollar amount field
-      {
-        id: 'annual_taxes',
-        label: 'Annual Taxes',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        defaultValue: '',
-        startAdornment: '$',
-        formatWithCommas: true,
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Annual Taxes must be greater than or equal to $${min}.')
-          .required()
-      },
-      {
-        id: 'monthly_insurance',
-        label: 'Monthly Insurance Expense',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        defaultValue: '200',
-        startAdornment: '$',
-        formatWithCommas: true,
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Monthly Insurance Expense must be greater than or equal to $${min}.')
-          .required()
-      },
-    ],
-  },
-  {
-    tabTitle: 'Variable Expenses',
-    formFields: [
-      // TODO: Consider adding post-vacancy toggle
-      {
-        id: 'capex_rate',
-        label: 'CapEx Rate',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '5',
-        endAdornment: '%',
-        helperText: [
-          `Capital Expenditures (Capex) Rate is calculated as the annual cost of major expenditures
-          (ex: replacing the roof, a new water heater, etc.) divided by the gross annual rental
-          income. It will vary greatly from property to property depending on age, location, cost
-          and other factors.`,
-          `Generally, setting aside 5-10% of rental income for CapEx is a good rule of thumb.`,
-        ],
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Capex Rate must be greater than or equal to ${min}%.')
-          .max(100, 'Capex Rate must be less than or equal to ${max}%.')
-          .required()
-      },
-      // TODO: Consider adding post-vacancy toggle
-      {
-        id: 'repairs_rate',
-        label: 'Repairs & Maintenance Rate',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '5',
-        endAdornment: '%',
-        helperText: [
-          `Repairs & Maintenance Rate is calculated as the annual cost of property repairs
-          (ex: a broken window, fixing the dishwasher, etc.) divided by the gross annual rental
-          income.`,
-          `Generally, setting aside 5-10% of rental income for repairs is a good
-          rule of thumb.`
-        ],
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Repairs Rate must be greater than or equal to ${min}%.')
-          .max(100, 'Repairs Rate must be less than or equal to ${max}%.')
-          .required()
-      },
-      {
-        id: 'vacancy_rate',
-        label: 'Vacancy Rate',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '5',
-        endAdornment: '%',
-        helperText: [
-          `Vacancy Rate is calculated as the percentage of time your property sits empty due
-          to tentant turnover. This figure will vary depending on the property's location and
-          condition, so talk to a local agent or investor to gain a better understanding of
-          expected vacancy.`,
-          `Typical vacancy rates range from 3-10%.`
-        ],
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Vacancy Rate must be greater than or equal to ${min}%.')
-          .max(100, 'Vacancy Rate must be less than or equal to ${max}%.')
-          .required()
-      },
-      // TODO: Consider adding post-vacancy toggle
-      {
-        id: 'property_management_rate',
-        label: 'Property Management Rate',
-        inputType: 'number',
-        gridWidth: 3,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '12',
-        endAdornment: '%',
-        helperText: [
-          `Property Management Rate is expressed as a percentage of total rental income and
-          represents the amount charged by the property manager to manage your property.`,
-          `Typical property management fees range from 9-12% depending on the market and
-          services provided.`,
-          `Enter '0' if you plan on managing your property yourself.`
-        ],
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Property Management Rate must be greater than or equal to ${min}%.')
-          .max(100, 'Property Management Rate must be less than or equal to ${max}%.')
-          .required()
-      },
-    ],
-  },
-  {
-    tabTitle: 'Growth Assumptions',
-    formFields: [
-      {
-        id: 'appreciation_rate',
-        label: 'Annual Appreciation Rate',
-        inputType: 'text',
-        gridWidth: 3,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '2',
-        endAdornment: '%',
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Annual Appreciation Rate must be greater than or equal to ${min}%.')
-          .max(100, 'Annual Appreciation Rate must be less than or equal to ${max}%.')
-          .required()
-      },
-      {
-        id: 'rent_growth',
-        label: 'Annual Rent Growth',
-        inputType: 'text',
-        gridWidth: 3,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '2',
-        endAdornment: '%',
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Annual Rent Growth must be greater than or equal to ${min}%.')
-          .max(100, 'Annual Rent Growth must be less than or equal to ${max}%.')
-          .required()
-      },
-      {
-        id: 'expense_growth',
-        label: 'Annual Expense Growth',
-        inputType: 'text',
-        gridWidth: 3,
-        required: true,
-        defaultValue: '2',
-        endAdornment: '%',
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Annual Expense Growth must be greater than or equal to ${min}%.')
-          .max(100, 'Annual Expense Growth must be less than or equal to ${max}%.')
-          .required()
-      },
-      {
-        id: 'selling_expense_rate',
-        label: 'Selling Expense Rate',
-        inputType: 'text',
-        gridWidth: 3,
-        required: true,
-        formatWithCommas: true,
-        defaultValue: '8',
-        endAdornment: '%',
-        helperText: [
-          `Selling Expense Rate represents the commission paid to the realtor
-          upon the sale of your property.`,
-          `Generally, this totals 5-10% of total sale proceeds.`
-        ],
-        validator: yup
-          .number()
-          .transform(stringToNumberYupTransformer)
-          .min(0, 'Selling Expense Rate must be greater than or equal to ${min}%.')
-          .max(100, 'Selling Expense Rate must be less than or equal to ${max}%.')
-          .required()
-      },
-    ],
-  },
-];
+//   return router.query[id];
+// }
+
 
 function generateInitialValues(tabs: TabType[], router: any, validationSchema: any) {
   const initialValues: { [key: string]: number | string }  = {};
   _.forEach(tabs, (tab: TabType) => {
     _.forEach(tab.formFields, (f: FormField) => {
-      initialValues[f.id] = (
-        // TODO: This is broken --> Maybe formik.validateField() or something?
-        (typeof validationSchema[f.id] === 'function' && validationSchema[f.id](router.query[f.id]))
-          ? router.query[f.id]
-          : f.defaultValue
-      );
+      let isFieldValid;
+      try {
+        // https://github.com/jquense/yup#mixedvalidatesyncatpath-string-value-any-options-object-any
+        // const fieldValue = getQueryStringValueById(f.id, router);
+        isFieldValid = validationSchema.validateSyncAt(f.id, router.query[f.id]);
+      } catch (e) {
+        console.log({ e });
+        // do nothing on purpose to stop exception from being thrown
+        // TODO: Consider doing something here, such as recording a metric
+      }
+
+      console.log({ isFieldValid, fieldVal: router.query[f.id], fid: f.id });
+      initialValues[f.id] = isFieldValid ? router.query[f.id] : f.defaultValue;
     })
   });
+
+  // purposely override f.property_address because it will be marked as invalid
+  initialValues.property_address = router.query['property_address'];
+
   return initialValues;
 }
 
@@ -548,14 +186,6 @@ function FormGrid({ fields, formik }: FormGridProps) {
   return (
     <Grid container spacing={2}>
       {_.map(fields, (field: FormField) => {
-        // TODO: Start here, sub in this component, pass down custom QS change function
-        // make it match the other components in terms of style
-        // if (field.id === TABS[0].formFields[0].id) {
-        //   return <GoogleMapsSearchBar />
-        // }
-
-        // TODO: Start here, sub in this component, pass down custom QS change function
-        // make it match the other components in terms of style
         const shouldRenderGoogleMapsAutocomplete = (field.id === TABS[0].formFields[0].id);
         
         const ConditionalComponent = field.formatWithCommas ? NumberFieldWithCommas : TextField;
@@ -667,15 +297,22 @@ function AnalyzePage(props: any) {
   const formik = useFormik({
     initialValues: generateInitialValues(TABS, router, validationSchema),
     validationSchema,
+    // TODO: Delete submit? seems like it is not used
     onSubmit: v => console.log(v),
-    // TODO: Figure out validation
+    // TODO: Figure out validation --> do I need this setting?
     // validateOnBlur: true,
   });
 
   useEffect(() => {
-    router.history.replace('/analyze?' + stringify(formik.values));
+    router.history.replace('/analyze?' + qs.stringify(formik.values));
     formik.validateForm();
   }, [formik.values]);
+
+  // console.log(formik.values);
+  // // @ts-ignore
+  // console.log('qs parse: ', router.query['purchase_price']);
+  // // @ts-ignore
+  // console.log('typeof qs parse: ', typeof router.query['purchase_price']);
 
   return (
     // TODO: Utilize MUI theming / spacing
